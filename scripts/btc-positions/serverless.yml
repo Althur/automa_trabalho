@@ -1,0 +1,61 @@
+service: btc-contracts
+
+custom:
+  apiKeys:
+    - name: mainwebsite
+  customDomain:
+    domainName: ${opt:domain}.abalustre.com
+    stage: ${opt:stage, self:provider.stage}
+    basePath: btc-contracts
+    createRoute53Record: false
+  pythonRequirements:
+    dockerizePip: non-linux
+  stage: ${opt:stage, self:provider.stage}
+  cors:
+    origin: "*"
+    headers:
+      - Content-Type
+      - X-Amz-Date
+      - Authorization
+      - X-Api-Key
+      - X-Amz-Security-Token
+      - X-Amz-User-Agent
+  settings:
+    dev:
+      ELASTICPATH: https://cacd71e4228a4b8d98ad24c0334c0445.us-east-1.aws.found.io:9243
+      ELASTICUSER: elastic
+      ELASTICPASSWORD: WkfRIFqDCx60XEOo3OSNJqYp
+      ELASTICID: "abalustre:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjYWNkNzFlNDIyOGE0YjhkOThhZDI0YzAzMzRjMDQ0NSRhM2QxNGRhN2M5Nzc0NzQ4YjljMzJlNTc0MTNmYzI3MA=="
+    prod:
+      ELASTICPATH: https://cacd71e4228a4b8d98ad24c0334c0445.us-east-1.aws.found.io:9243
+      ELASTICUSER: elastic
+      ELASTICPASSWORD: WkfRIFqDCx60XEOo3OSNJqYp
+      ELASTICID: "abalustre:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjYWNkNzFlNDIyOGE0YjhkOThhZDI0YzAzMzRjMDQ0NSRhM2QxNGRhN2M5Nzc0NzQ4YjljMzJlNTc0MTNmYzI3MA=="
+
+provider:
+  name: aws
+  region: us-east-1
+  profile: bissuh
+  runtime: python3.8
+  tracing:
+    lambda: false
+    apiGateway: false
+  environment: ${self:custom.settings.${self:custom.stage}}
+  timeout: 30
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:*"
+      Resource: "arn:aws:s3:::abalustre-btc-contracts/*"
+
+plugins:
+  - serverless-offline
+  - serverless-python-requirements
+  - serverless-add-api-key
+  - serverless-domain-manager
+
+functions:
+  import-btc-contracts:
+    name: ${self:custom.stage}-${self:service}-import-btc-contracts
+    handler: import-btc-contracts.handler
+    description: every btc contract in imbarq available for every fund managed.

@@ -1,8 +1,19 @@
 import os
-import sys
+import sys 
+import csv
+import pprint
+import ndjson
+import json
+import boto3
 
-import numpy as numpy
+import numpy as np
 import pandas as pd
+import xml.etree.ElementTree as ET
+
+from datetime import timedelta, datetime
+from elasticsearch import Elasticsearch, helpers
+from boxsdk import OAuth2, Client
+from xml.dom.minidom import parse, parseString
 
 def read_file_lines(file_path): # read txt file
     with open(file_path) as f:
@@ -150,8 +161,6 @@ def create_group_target_list(file_lines, target_size=[0,2]):#not working
     return target_list, group_list
 
 
-
-
 def organise_btc(btc_data, index_test = 1):
 
     register_id = btc_data[index_test][0:2]
@@ -208,11 +217,16 @@ def organise_btc(btc_data, index_test = 1):
     #observe = [ticker_symbol, liquidation_quantity, present_quantity]
     #print(observe)
 
+    #print(present_quantity)
+    #int_present_quantity = int(present_quantity)
+    #int_liquidation_quantity = int(liquidation_quantity)
+    #int_contract_interest = int(contract_interest)
+
     full_source = {  # per contract
         "date-of-register": trade_date,
-        "contract-quantity": int(present_quantity),
+        "contract-quantity": int(present_quantity),  # needs to be int
         "ticker-symbol": ticker_symbol,
-        "previous-liquidation-quantity": int(liquidation_quantity),
+        "previous-liquidation-quantity": liquidation_quantity, # needs to be int
         "contract-id": contract_number,
         "fund-account-and-broker": {
             "broker": executor_participant,
@@ -220,24 +234,25 @@ def organise_btc(btc_data, index_test = 1):
         },
         "position-reference-date": movement_date, 
         "contract-exp-date": expire_date,
-        "net-contract-quantity": int(present_quantity)-int(liquidation_quantity),
-        "contract-interest-rate": int(contract_interest) 
+        "net-contract-quantity":'',#int_present_quantity-int_liquidation_quantity,
+        "contract-interest-rate": contract_interest
     }
 
     elements_observed = [ticker_symbol, liquidation_quantity, present_quantity, 
-    movement_date, trade_date, expire_date, executor_participant_investor, contract_number]
+    movement_date, trade_date, expire_date, executor_participant_investor, 
+    contract_number, executor_participant, contract_interest, nature, underlying_asset_id, 
+    due_date, portfolio_id, referenc_price_underlying_asset, 
+    ]
 
     #print(elements_observed)
-    return elements_observed
+    return elements_observed #full_source # elements_observed,
 
 def build_contract_list(contract_source, fund_nick):
     fund_list = create_fund_list()
 
-    all_contracts:{
+    all_contracts = {
 
     }
-
-
     for i in range(len(fund_list)):
         if all_contracts:
             if fund_list[i] == all_contracts[fund_list[i]]:
@@ -306,6 +321,8 @@ def btc_position(current_btc_list):
 def build_btc_list(btc_elements):
     # btc_elements = aluguel_de_ativos
 
+    #btc_elements = btc_elements[0]
+
     elements = []
     for i in range(len(btc_elements)):
         elements.append(organise_btc(btc_elements, index_test=i))
@@ -313,6 +330,8 @@ def build_btc_list(btc_elements):
 
     btc_list = []
     for item in range(len(elements)):
+        #print(elements[item][1])
+        #print(int(elements[item][1]))
         ticker_symb = elements[item][0].strip()
         liquidation_qnty = -int(elements[item][1])
         contract_quantity = int(elements[item][2])
@@ -430,8 +449,6 @@ def create_btc_list_for_each_fund(funds_accounts, btc_list, fund_list):
     net_prev_master_btc_list = sum_net_btc(prev_master_btc_list)
 
     #print(net_tech_btc_list)
-
-
     #print_btc(net_tech_btc_list)
     #print_btc(net_master_btc_list)
     #print_btc(net_multi_btc_list)
@@ -446,8 +463,169 @@ def create_btc_list_for_each_fund(funds_accounts, btc_list, fund_list):
 
     return all_funds
 
-    
-
-    
-
             
+def build_contract_list(btc_elements):
+    # btc_elements = aluguel_de_ativos
+    btc_elements = btc_elements[1]
+    elements = []
+    for i in range(len(btc_elements)):
+        elements.append(organise_btc(btc_elements, index_test=i))
+
+
+    btc_list = []
+    for item in range(len(elements)):
+        ticker_symb = elements[item][0].strip()
+        liquidation_qnty = -int(elements[item][1])
+        contract_quantity = int(elements[item][2])
+        #print(contract_quantity+3)
+        date_of_position = elements[item][3] # data da posicao
+        date_of_trade = elements[item][4] # data de registro
+        expiration_date = elements[item][5] # data do vcto do contrato
+        fund_id = int(elements[item][6]) # C/C do fundo na respectiva corretora 
+        interm_list = [ticker_symb, liquidation_qnty, contract_quantity, date_of_position,
+                        date_of_trade, expiration_date, fund_id]
+
+        btc_list.append(interm_list)
+
+    return btc_list
+
+
+def build_btc_contract_info(btc_elements):
+
+    elements = []
+
+    for i in range(len(btc_elements)):
+        elements.append(organise_btc(btc_elements, index_test=i))
+
+    fund_acc = fund_brokerage_accounts()
+
+    btc_obj_list = []
+    broker_obj = counterparty_list()
+    xp_number = broker_obj["xp"]
+    guide_number = broker_obj["guide"]
+    pactual_number = broker_obj["pactual"]
+    futura_number = broker_obj["futura"]
+
+    for item in range(len(elements)):
+        ticker_symb = elements[item][0].strip()
+        liquidation_qnty = -int(elements[item][1])
+        contract_quantity = int(elements[item][2])
+        date_of_position = elements[item][3]
+        date_of_trade = elements[item][4]
+        expiration_date = elements[item][5]
+        fund_acc_number = int(elements[item][6])
+        contract_id = elements[item][7].strip()
+        broker_number = int(elements[item][8])
+        net_contract_quantity = contract_quantity+liquidation_qnty
+        contract_interest = int(elements[item][9])
+        portfolio_id = int(elements[item][13])
+        referenc_price_underlying_asset = int(elements[item][14])  # = n/10^7
+        if int(elements[item][10]) == 4: # pegar se eh doador ou tomador
+            lender_borrower = "T"    
+        elif int(elements[item][10]) == 3:
+            lender_borrower = "D"
+        test_element = int(elements[item][11])
+        due_date = elements[item][12]
+        if broker_number == xp_number:
+            counterparty = "xp"
+        elif broker_number == guide_number:
+            counterparty = "guide"
+        elif broker_number == pactual_number:
+            counterparty = "pactual"
+        elif broker_number == futura_number:
+            counterparty = "futura"
+        else:
+            counterparty = "not-listed... corretora não cadastrada no código #def build_btc _contract_info"
+        for fund in fund_acc:
+            for acc in fund_acc[fund]:
+                if fund_acc_number == fund_acc[fund][acc]:
+                    nick = fund
+                else: 
+                    pass
+
+        #counterparty = elements[item][13]  if == 3 XP 
+        #executor_participant_investor = 
+        obj = {
+            "position-date": date_of_position, # format:
+            "lender-borrower": lender_borrower, 
+            "ticker-symbol": ticker_symb, 
+            "fund-account-number": fund_acc_number, 
+            "contract-number": contract_id,
+            "register-date": date_of_trade, 
+            "previous-liquidation-quantity": liquidation_qnty, 
+            "expire-date": expiration_date, 
+            "due-date": due_date,
+            "test-element": test_element,
+            "quantity": contract_quantity,
+            "net-present-quantity": net_contract_quantity, 
+            "wallet-number": portfolio_id, # carteira planilha margem novo
+            "underlying-asset-price": referenc_price_underlying_asset,  # ver na planilha margem novo
+            "contract-interest-rate": contract_interest,
+            "counterparty": counterparty, # contra parte
+            "brokerage-firm": broker_number, # corretora
+            "daily-cost": '', # custo diario
+            "days-to-exp": '', # dias até vcto -> formula business days
+            "margin-call": '', # chamada-de margem
+            "fund-nickname": nick
+        }
+
+        btc_obj_list.append(obj)
+
+    return btc_obj_list
+
+
+def jprint(obj):
+    # create a formatted string of the Python JSON object
+    text = json.dumps(obj, sort_keys=True, indent=4)
+    print(text)
+
+
+def counterparty_list():
+    c_list = {
+        "xp": 3, 
+        "pactual": 85,
+        "futura": 93,
+        "orama": 3701,
+        "credit-suisse": 6003,
+        "morgan-stanely": 40,
+        "c6": 6003,
+        "inter": 1099,
+        "itau": 114,
+        "cm": 88,
+        "tullett": 127,
+        "terra": 107,
+        "modal": 1982,
+        "bny-mellon": 3611, # pq que tem no imbarq apenas algumas contas e n de todos os fundos?
+        "jpm": 16,
+        "guide": 15,
+        "merril-lynch": 13,
+    }
+    return c_list
+
+def counterparty_liquidation_list():
+    # Criar aqui a lista dos nomes das corretoras "aceitas" pela mellon. e.g.: XP = AMERINV
+    return 0
+
+def segmenta_imbarq(lines, target_group_list, target_range=[0,2]):
+  target_list = target_group_list[0] # lista com os tipos de registros do arquivo IMBARQ001
+  group_list = target_group_list[1]  # lista de listas vazias na quantidade do tipos de registros
+  for i in range(len(lines)):
+    if lines[i][target_range[0]:target_range[1]] == target_list[0]:
+      print("make money")
+    for j in range(len(target_list)):
+      if lines[i][target_range[0]:target_range[1]] == target_list[j]:
+        group_list[j].append(lines[i]) # add à lista de grupos cada segmento do IMBARQ001 separado individualmente  
+        #print("pump it up")
+
+  return group_list
+
+
+
+def xml_root(source):
+    tree = ET.parse(source)
+    root = tree.getroot()
+    #root = ET.fromstring(source)
+    return root
+
+
+

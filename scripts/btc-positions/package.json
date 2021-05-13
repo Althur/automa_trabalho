@@ -1,0 +1,17 @@
+{
+  "name": "python-btc-contracts",
+  "scripts": {
+    "deploy:prod": "sls deploy --stage prod --domain api",
+    "offline": "export AWS_PROFILE=bissuh && serverless offline --noAuth --stage prod --domain api",
+    "w-offline": "serverless offline --noAuth --domain api",
+    "w-local": "serverless invoke local --function import-btc-contracts --path sample.json --domain api"
+  },
+  "devDependencies": {
+    "serverless-offline": "^6.9.0"
+  },
+  "dependencies": {
+    "serverless-add-api-key": "^4.2.0",
+    "serverless-domain-manager": "^5.1.0",
+    "serverless-python-requirements": "^5.1.1"
+  }
+}

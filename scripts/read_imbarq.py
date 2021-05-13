@@ -134,7 +134,7 @@ build_btc_list(aluguel_de_ativos)
 
 #sum_net_btc(build_btc_list(aluguel_de_ativos))
 # falta somar individualmente os ativos por fundo
-
+"""
 d = fund_brokerage_accounts() # fund accounts
 for i in d:
   print(i, ':', d[i])
@@ -143,14 +143,22 @@ for i in d:
   for c in d[i]:
     print(i, ':', d[i][c])
 
-
+"""
 print()
 
 fund_list = create_fund_list()
 btc_list = build_btc_list(aluguel_de_ativos) 
-fund_acc = fund_brokerage_accounts()
+fund_acc = fund_brokerage_accounts() # contas e corretoras de cada fundo por nickname
 
 create_btc_list_for_each_fund(funds_accounts=fund_acc, btc_list=btc_list, fund_list=fund_list)
 btc_of_all_funds = create_btc_list_for_each_fund(funds_accounts=fund_acc, btc_list=btc_list, fund_list=fund_list)
-print()
-print(btc_of_all_funds["ac_master_btc"])
+#print()
+#print(btc_of_all_funds["ac_master_btc"])
+
+
+#print(build_contract_list(aluguel_de_ativos))
+objects = build_btc_contract_info(aluguel_de_ativos)
+
+for i in range(len(objects)):
+  jprint(objects[i])
+
