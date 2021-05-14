@@ -27,6 +27,7 @@ def handler(event, context):
   custodian = header.find('cnpjcustodiante').text
   equity = float(header.find('patliq').text)
   fund_name = header.find("nome").text
+  manager = header.find("nomegestor").text 
 
   obj = {
     "date": date.strftime("%Y-%m-%d"),
@@ -35,7 +36,8 @@ def handler(event, context):
     "equity": equity,
     "fund_name": fund_name,
     "administrator": admin,
-    "custodian": custodian
+    "custodian": custodian,
+    "manager": manager
     }
 
     import_data = {
